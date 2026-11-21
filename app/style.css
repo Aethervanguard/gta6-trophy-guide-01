@@ -15,6 +15,7 @@
   --silver: #cfd6e4;
   --bronze: #e0915a;
   --platinum: #8fe9ff;
+  --green: #7dffb0;
   --danger: #ff6b6b;
   --radius: 14px;
 }
@@ -31,6 +32,12 @@ body {
   font-size: 17px;
   line-height: 1.5;
   min-height: 100vh;
+}
+
+kbd {
+  font: inherit; font-size: 14px; font-weight: 700;
+  background: var(--bg2); border: 1px solid var(--line); border-bottom-width: 3px;
+  border-radius: 6px; padding: 1px 7px;
 }
 
 /* ---------- header ---------- */
@@ -132,6 +139,7 @@ h1 { font-size: 30px; line-height: 1.15; margin: 0; letter-spacing: .3px; }
   transition: width .3s ease;
 }
 .progress-line { margin: 12px 0 0; font-size: 16px; }
+.next-up-line { margin: 8px 0 0; font-size: 16px; color: var(--cyan); font-weight: 700; }
 .grade-counts {
   list-style: none; display: flex; flex-wrap: wrap; gap: 8px 20px;
   margin: 12px 0 0; padding: 0; font-size: 16px;
@@ -169,7 +177,7 @@ main { padding: 0 24px 8px; }
 .view-intro { color: var(--muted); margin: 0 0 16px; max-width: 72ch; }
 .spoiler-status {
   margin: 0 0 16px; padding: 10px 14px;
-  background: #123a2e; border: 1px solid #7dffb0; border-radius: 10px;
+  background: #123a2e; border: 1px solid var(--green); border-radius: 10px;
   color: #b8ffce; font-size: 15px;
 }
 .source-note { color: var(--muted); font-size: 15px; }
@@ -209,7 +217,7 @@ main { padding: 0 24px 8px; }
 .trophy-name { font-size: 18px; font-weight: 800; margin: 0; }
 .trophy-desc { margin: 2px 0 0; color: var(--muted); font-size: 15px; }
 .trophy-meta { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; grid-column: 2; }
-.badge-grade, .badge-kind, .badge-count, .badge-missable, .badge-hidden {
+.badge-grade, .badge-kind, .badge-count, .badge-missable, .badge-hidden, .badge-note {
   font-size: 13px; font-weight: 800; letter-spacing: .4px;
   border-radius: 999px; padding: 2px 10px; text-transform: uppercase;
 }
@@ -218,10 +226,16 @@ main { padding: 0 24px 8px; }
 .badge-grade.silver { background: #3a4152; color: var(--silver); border: 1px solid var(--silver); }
 .badge-grade.bronze { background: #4a2a12; color: var(--bronze); border: 1px solid var(--bronze); }
 .badge-kind { background: #2b1a4d; color: var(--cyan); border: 1px solid var(--cyan); }
-.badge-count { background: #123a2e; color: #7dffb0; border: 1px solid #7dffb0; }
+.badge-count { background: #123a2e; color: var(--green); border: 1px solid var(--green); }
 .badge-missable { background: #5c0e22; color: #ffb3c8; border: 1px solid var(--pink); }
 .badge-hidden { background: #241a35; color: var(--muted); border: 1px solid var(--muted); }
+.badge-note { background: #3a2a05; color: var(--gold); border: 1px solid var(--gold); }
 .spoiler-name { color: var(--muted); font-style: italic; }
+
+/* Per-trophy target progress: a thin bar under the badges, fed by the + / − stepper. */
+.target-bar { grid-column: 2; height: 8px; margin-top: 8px; background: #170a2b; border-radius: 999px; border: 1px solid var(--line); overflow: hidden; }
+.target-bar span { display: block; height: 100%; background: var(--green); }
+.target-text { grid-column: 2; font-size: 13px; color: var(--green); font-weight: 700; margin-top: 2px; }
 
 /* ---------- detail panel ---------- */
 .detail {
@@ -252,8 +266,32 @@ main { padding: 0 24px 8px; }
 .source-list { list-style: none; margin: 0; padding: 0; }
 .source-list li { margin: 6px 0; font-size: 15px; }
 .source-list a { color: var(--cyan); }
+.source-line { font-size: 14px; color: var(--muted); margin: 8px 0 0; }
+.source-line a { color: var(--cyan); }
 .detail .close-btn { margin-top: 14px; }
 .earned-toggle { margin-top: 14px; width: 100%; }
+
+/* Target stepper in the detail panel: − / count / + for PSN-tracked counts. */
+.stepper { display: flex; align-items: center; gap: 10px; margin: 10px 0 4px; }
+.stepper button {
+  font: inherit; font-size: 20px; font-weight: 900; line-height: 1;
+  width: 40px; height: 40px; border-radius: 10px;
+  color: var(--ink); background: var(--card2);
+  border: 2px solid var(--line); cursor: pointer;
+}
+.stepper button:hover { border-color: var(--cyan); }
+.stepper .stepper-value { font-size: 18px; font-weight: 900; min-width: 110px; text-align: center; }
+.stepper-note { color: var(--muted); font-size: 14px; margin: 0; }
+
+/* Personal note per trophy, saved in the browser. */
+.note-box {
+  width: 100%; min-height: 64px; resize: vertical;
+  font: inherit; font-size: 15px; color: var(--ink);
+  background: var(--bg2); border: 2px solid var(--line); border-radius: 10px;
+  padding: 10px 12px; margin-top: 6px;
+}
+.note-box:focus { border-color: var(--cyan); outline: none; }
+.note-saved { color: var(--green); font-size: 14px; font-weight: 700; margin: 4px 0 0; min-height: 1.2em; }
 
 /* ---------- roadmap ---------- */
 .roadmap { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 14px; }
@@ -268,8 +306,32 @@ main { padding: 0 24px 8px; }
 .roadmap h3 .stage-time { color: var(--cyan); font-size: 16px; font-weight: 700; }
 .roadmap p, .roadmap ul { margin: 6px 0; }
 .roadmap ul { padding-left: 22px; }
+.stage-progress { display: flex; align-items: center; gap: 10px; margin: 8px 0 2px; }
+.stage-progress .stage-bar { flex: 1; height: 10px; background: #170a2b; border-radius: 999px; border: 1px solid var(--line); overflow: hidden; }
+.stage-progress .stage-bar span { display: block; height: 100%; background: linear-gradient(90deg, var(--cyan), var(--pink)); }
+.stage-progress .stage-count { font-size: 14px; font-weight: 800; color: var(--cyan); white-space: nowrap; }
+.stage-done { color: var(--green); font-weight: 800; }
 .checklist-plain { padding-left: 22px; }
 .checklist-plain li { margin: 6px 0; }
+
+/* ---------- planner (Up next) ---------- */
+.planner { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.planner > li {
+  display: grid; grid-template-columns: 44px 1fr auto; gap: 4px 14px;
+  background: var(--card2);
+  border: 2px solid var(--line);
+  border-left: 8px solid var(--cyan);
+  border-radius: 12px;
+  padding: 10px 16px;
+  cursor: pointer;
+}
+.planner > li:hover { border-color: var(--cyan); }
+.planner > li.missable-first { border-left-color: var(--pink); }
+.planner .plan-rank { font-size: 26px; font-weight: 900; color: var(--cyan); line-height: 1.1; }
+.planner .plan-why { margin: 4px 0 0; color: var(--muted); font-size: 15px; }
+.planner .plan-why strong { color: var(--ink); }
+.planner .plan-open { align-self: center; }
+.planner-empty { color: var(--muted); }
 
 /* ---------- footer ---------- */
 footer {
@@ -285,6 +347,8 @@ footer a { color: var(--cyan); }
   .detail { position: static; max-height: none; }
   h1 { font-size: 24px; }
   .progress-count { font-size: 36px; }
+  .planner > li { grid-template-columns: 34px 1fr; }
+  .planner .plan-open { grid-column: 2; justify-self: start; }
 }
 @media (max-width: 640px) {
   body { font-size: 16px; }
