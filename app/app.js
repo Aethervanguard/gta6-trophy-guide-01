@@ -1,938 +1,571 @@
-// Leonida Trophy Guide v2 — checklist, roadmap, missables and an Up next planner
-// for GTA VI (PS5). Data lives in data/trophies.json (official names, descriptions,
-// grades + our own cited guides). Progress, target counters and notes live in
-// localStorage; nothing is fetched from the network except the local data file,
-// by a relative path.
+// Leonida Trophy Guide — app logic. Browser standard library only.
+// Trophy names, descriptions, grades and guides come from
+// data/trophies.json at runtime; nothing is embedded here and nothing is
+// fetched from the network.
 
 const DATA_URL = 'data/trophies.json';
-const PROGRESS_KEY = 'gta6-trophy-progress-v2';
-const TARGETS_KEY = 'gta6-trophy-targets-v2';
-const NOTES_KEY = 'gta6-trophy-notes-v2';
-const SETTINGS_KEY = 'gta6-trophy-settings-v2';
+const STORAGE_KEY = 'leonida-trophy-guide-v3';
+const GRADE_ORDER = { platinum: 0, gold: 1, silver: 2, bronze: 3 };
 
-const GRADE_LABEL = { platinum: 'Platinum', gold: 'Gold', silver: 'Silver', bronze: 'Bronze' };
-const KIND_LABEL = { story: 'Story', missable: 'Missable', collectibles: 'Collectibles', activities: 'Activities', online: 'Online' };
-const GRADE_RANK = { platinum: 0, gold: 1, silver: 2, bronze: 3 };
-
-// Roadmap stages, built from the official descriptions and PowerPyx's roadmap
-// (200 hours, 4/10, one playthrough, one potentially missable trophy). Each stage
-// names the trophies it covers, so the roadmap can show live progress per stage.
-const ROADMAP = [
-  {
-    title: 'Stage 1 — Play the story, mind the one missable moment',
-    time: '60–80 hours · Chapters 1–5',
-    ids: [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 28],
-    points: [
-      'Play all 5 chapters and the final mission. Story trophies pop automatically — 13 hidden story trophies in total.',
-      'Do the one thing that cannot wait: in Chapter 1, after the mission Down to Earth, talk to Lucia in the kitchen at Jason’s house in the morning, follow her to the balcony and choose Accept — the first meditation for Positive Mental Attitude. It is gone after Chapter 1.',
-      'Pick up optional missions as they appear (purple icons, and black icons with pink letters). They introduce robberies, fishing, hunting and the quest givers Andy, Kenton, Billy, Randy, Tyrone and Bret.',
-      'Scan every new vehicle with the WAiNK app and study animals through the binoculars as you travel — 100% completion needs 200 of 277 base-model vehicles and 100 of 255 animals.',
-      'Keep manual saves: 15 slots. Save at the start and end of each chapter.',
-    ],
-  },
-  {
-    title: 'Stage 2 — Strangers, questlines and side characters',
-    time: 'Alongside the story',
-    ids: [16, 20, 21, 22, 23, 24, 25, 26, 27, 29],
-    points: [
-      'Finish the 8 Strangers & Freaks strands that count (Kirk, Kyle, Yago, Pilot Pete and more) — Moses, Tyrone, Yasmani, Andy, Billy and Eddie do not count toward the trophy.',
-      'Complete the final mission for each side character: Andy (Lucia only), Kenton (treasure diving, 7 shipwrecks), Billy (Thrillbilly Mudclub), Randy (16 sports cars), Tyrone (Jason only, destroy the Synthetic Labs) and Bret (Jason only, hunting).',
-      'Beat Cal in a fishing challenge, finish one arcade game, and try all 9 activity types for Master of None.',
-    ],
-  },
-  {
-    title: 'Stage 3 — 100% completion checklist',
-    time: 'About 100 hours · after the story',
-    ids: [14, 15, 17, 18, 30, 31, 32, 35, 40, 42, 43],
-    points: [
-      'After the ending, the checklist opens under Progress, then Stats, then 100% Completion. Everything in it stays doable in free-roam.',
-      'Clear every robbery first: all 39 gang operations, all 22 bank jobs, all 8 bank vaults (5 for Maximum Withdrawal, 8 for the checklist), plus the Payday Loan jobs.',
-      'Finish the activity grind: 300 stunts (250 for Cunning Stunts), gold in all 42 shooting range challenges, drone races at all 14 locations, 20 different race wins.',
-      'Finish the collectibles that count: 15 of 18 card sets, 100 WAiNK scans, 33 underwater discoveries, 100 Cocaine Flamingos, 15 of 18 meditation spots.',
-      'Complete any 70 of the 80 challenges — 50 of them pops One Last Thing on the way.',
-    ],
-  },
-  {
-    title: 'Stage 4 — Cleanup and the platinum',
-    time: 'About 10 hours',
-    ids: [1, 33, 34, 36, 37, 38, 39, 41, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55],
-    points: [
-      'Mop up the miscellaneous trophies: explore all 52 areas of Leonida, discover 100 vehicles, launder $250,000 in marked bills, spend $100,000 in shops, buy all 8 garages, register 10 vehicles to Scooter Bros.',
-      'Do the odd ones: the Ocean Beach cocktail, the blue Banshee through the showroom window, the Kingpin Bowling valuables, max strength with both characters, 500 criminal-profile actions, the Payday Loans store again as Lucia, the UFO north-west of Starlet Motel after 2 AM, and the melee drive-by kicks.',
-      'A Long Road (100% completion) is usually the last trophy. When it pops, Vice Got a Price! — the platinum — pops with it.',
-    ],
-  },
-];
-
-const COMPLETION_NEEDS = [
-  'All 39 illegal gang operations (Pest Control needs 1 per gang, the checklist needs all 39).',
-  'All 22 bank jobs and all 8 large bank vaults.',
-  'All shooting range gold medals (42) and all drone races.',
-  'All of Bret’s hunting quests (15 Target Decks).',
-  'All 33 underwater discoveries.',
-  'Any 70 of the 80 challenges.',
-  'Any 200 of the 277 base-model vehicles scanned; any 100 of the 255 animals studied.',
-  'Any 300 of the 397 stunts.',
-  'Any 15 of the 18 collectible card sets; any 15 of the 18 meditation spots.',
-  'Any 100 of the optional missions (there are 200–300+, so expired ones do not matter).',
-];
+let trophies = [];
+let sourceNames = [];
+let state = {
+  view: 'checklist',
+  earned: new Set(),
+  counters: {},
+  notes: {},
+  spoiler: false,
+  openId: null,
+  filters: { grade: 'all', hidden: 'all', missable: 'all', earned: 'all', search: '' },
+  sort: 'id',
+};
 
 const $ = (id) => document.getElementById(id);
-const listEl = $('trophyList');
-const detailEl = $('detailPanel');
+const el = (tag, cls, text) => {
+  const n = document.createElement(tag);
+  if (cls) n.className = cls;
+  if (text !== undefined && text !== null) n.textContent = text;
+  return n;
+};
 
-// --- state ---------------------------------------------------------------
-const params = new URLSearchParams(location.search);
-let earned = loadProgress();
-let targets = loadTargets();
-let notes = loadNotes();
-let settings = loadSettings();
-let selectedId = null;
+// ---------- state: load / save / URL ----------
 
-function loadSet(key) {
+function loadStored() {
   try {
-    const raw = localStorage.getItem(key);
-    const arr = raw ? JSON.parse(raw) : [];
-    return new Set(Array.isArray(arr) ? arr.filter((n) => typeof n === 'number') : []);
-  } catch {
-    return new Set();
-  }
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return;
+    const saved = JSON.parse(raw);
+    if (Array.isArray(saved.earned)) state.earned = new Set(saved.earned);
+    if (saved.counters && typeof saved.counters === 'object') state.counters = saved.counters;
+    if (saved.notes && typeof saved.notes === 'object') state.notes = saved.notes;
+    if (typeof saved.spoiler === 'boolean') state.spoiler = saved.spoiler;
+  } catch (e) { /* corrupted storage: start fresh */ }
 }
 
-function loadProgress() { return loadSet(PROGRESS_KEY); }
-
-function loadTargets() {
+function saveStored() {
   try {
-    const raw = localStorage.getItem(TARGETS_KEY);
-    const obj = raw ? JSON.parse(raw) : {};
-    const map = new Map();
-    if (obj && typeof obj === 'object') {
-      for (const [k, v] of Object.entries(obj)) {
-        const id = Number(k);
-        if (Number.isInteger(id) && Number.isFinite(v) && v > 0) map.set(id, Math.floor(v));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      earned: [...state.earned].sort((a, b) => a - b),
+      counters: state.counters,
+      notes: state.notes,
+      spoiler: state.spoiler,
+    }));
+  } catch (e) { /* storage unavailable: session-only */ }
+}
+
+function readUrl() {
+  const p = new URLSearchParams(location.search);
+  const view = p.get('view');
+  if (view === 'checklist' || view === 'roadmap' || view === 'missables' || view === 'planner') {
+    state.view = view;
+  }
+  if (p.has('earn')) {
+    state.earned = new Set(
+      p.get('earn').split(',').map((s) => parseInt(s, 10)).filter((n) => Number.isFinite(n)),
+    );
+  }
+  if (p.has('tgt')) {
+    state.counters = {};
+    for (const part of p.get('tgt').split(',')) {
+      const i = part.indexOf(':');
+      if (i > 0) {
+        const id = parseInt(part.slice(0, i), 10);
+        const val = parseInt(part.slice(i + 1), 10);
+        if (Number.isFinite(id) && Number.isFinite(val)) state.counters[id] = Math.max(0, val);
       }
     }
-    return map;
-  } catch {
-    return new Map();
   }
-}
-
-function loadNotes() {
-  try {
-    const raw = localStorage.getItem(NOTES_KEY);
-    const obj = raw ? JSON.parse(raw) : {};
-    const map = new Map();
-    if (obj && typeof obj === 'object') {
-      for (const [k, v] of Object.entries(obj)) {
-        const id = Number(k);
-        if (Number.isInteger(id) && typeof v === 'string' && v.trim()) map.set(id, v);
+  if (p.has('note')) {
+    state.notes = {};
+    for (const part of p.get('note').split(',')) {
+      const i = part.indexOf(':');
+      if (i > 0) {
+        const id = parseInt(part.slice(0, i), 10);
+        if (Number.isFinite(id)) {
+          try { state.notes[id] = decodeURIComponent(part.slice(i + 1)); } catch (e) { state.notes[id] = part.slice(i + 1); }
+        }
       }
     }
-    return map;
-  } catch {
-    return new Map();
   }
-}
-
-function loadSettings() {
-  const base = { spoiler: false, hideEarned: false };
-  try {
-    const raw = localStorage.getItem(SETTINGS_KEY);
-    if (raw) return { ...base, ...JSON.parse(raw) };
-  } catch { /* fall through with defaults */ }
-  if (params.get('spoiler') === '1') base.spoiler = true;
-  if (params.get('spoiler') === '0') base.spoiler = false;
-  return base;
-}
-
-function saveProgress() {
-  localStorage.setItem(PROGRESS_KEY, JSON.stringify([...earned].sort((a, b) => a - b)));
-}
-function saveTargets() {
-  localStorage.setItem(TARGETS_KEY, JSON.stringify(Object.fromEntries(targets)));
-}
-function saveNotes() {
-  localStorage.setItem(NOTES_KEY, JSON.stringify(Object.fromEntries(notes)));
-}
-function saveSettings() {
-  localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
-}
-
-// Preview links (?earn=2,3,15) mark trophies earned for this view only,
-// without touching saved progress — handy for sharing a checklist state.
-// ?tgt=15:120,17:20 previews target counters the same way, and
-// ?note=28:do+the+balcony+meditation+first previews a note.
-const previewEarned = new Set(
-  (params.get('earn') || '').split(',').map((s) => Number(s)).filter((n) => Number.isInteger(n) && n > 0),
-);
-const previewTargets = new Map();
-for (const part of (params.get('tgt') || '').split(',').filter(Boolean)) {
-  const [a, b] = part.split(':').map(Number);
-  if (Number.isInteger(a) && Number.isInteger(b) && b > 0) previewTargets.set(a, b);
-}
-const previewNotes = new Map();
-{
-  const raw = params.get('note');
-  if (raw) {
-    const colon = raw.indexOf(':');
-    if (colon > 0) {
-      const id = Number(raw.slice(0, colon));
-      if (Number.isInteger(id)) previewNotes.set(id, raw.slice(colon + 1));
-    }
+  const open = p.get('open');
+  if (open) {
+    const id = parseInt(open, 10);
+    if (Number.isFinite(id)) state.openId = id;
   }
+  if (p.get('spoiler') === '1') state.spoiler = true;
 }
 
-function isEarned(t) {
-  return earned.has(t.id) || previewEarned.has(t.id);
+function writeUrl() {
+  const p = new URLSearchParams();
+  if (state.view !== 'checklist') p.set('view', state.view);
+  if (state.earned.size) p.set('earn', [...state.earned].sort((a, b) => a - b).join(','));
+  const tgt = Object.entries(state.counters)
+    .filter(([, v]) => v > 0)
+    .sort((a, b) => a[0] - b[0])
+    .map(([id, v]) => id + ':' + v);
+  if (tgt.length) p.set('tgt', tgt.join(','));
+  const notes = Object.entries(state.notes)
+    .filter(([, v]) => v)
+    .sort((a, b) => a[0] - b[0])
+    .map(([id, v]) => id + ':' + encodeURIComponent(v));
+  if (notes.length) p.set('note', notes.join(','));
+  if (state.openId) p.set('open', String(state.openId));
+  if (state.spoiler) p.set('spoiler', '1');
+  const qs = p.toString();
+  history.replaceState(null, '', qs ? '?' + qs : location.pathname);
 }
-function targetOf(t) {
-  return previewTargets.get(t.id) ?? targets.get(t.id) ?? 0;
+
+function commit() {
+  saveStored();
+  writeUrl();
+  renderAll();
 }
-function noteOf(t) {
-  return previewNotes.get(t.id) ?? notes.get(t.id) ?? '';
-}
-// How far a trophy is toward done: 1 when earned, else its target fraction.
-function progressFrac(t) {
+
+// ---------- helpers ----------
+
+function byId(id) { return trophies.find((t) => t.id === id); }
+function isEarned(t) { return state.earned.has(t.id); }
+function counterOf(t) { return state.counters[t.id] || 0; }
+function progressOf(t) {
   if (isEarned(t)) return 1;
-  if (t.count) return Math.min(1, targetOf(t) / t.count);
+  if (t.count) return Math.min(1, counterOf(t) / t.count);
   return 0;
 }
-
-// --- data ----------------------------------------------------------------
-const doc = await (await fetch(DATA_URL)).json();
-const trophies = doc.trophies;
-const byId = new Map(trophies.map((t) => [t.id, t]));
-const missables = trophies.filter((t) => t.missable);
-
-// --- spoiler masking -----------------------------------------------------
-function isSpoilerHidden(t) {
-  return settings.spoiler && t.kind === 'story' && !isEarned(t);
+function setEarned(t, on) {
+  if (on) state.earned.add(t.id); else state.earned.delete(t.id);
 }
+function setCounter(t, val) {
+  const v = Math.max(0, Math.min(t.count || 0, val));
+  if (v > 0) state.counters[t.id] = v; else delete state.counters[t.id];
+  if (t.count && v >= t.count) state.earned.add(t.id);
+}
+function gradeLabel(g) { return g.charAt(0).toUpperCase() + g.slice(1); }
 
-// --- rendering: progress --------------------------------------------------
-function renderProgress() {
+// ---------- rendering: header ----------
+
+function renderHeader() {
+  const earned = trophies.filter(isEarned).length;
   const total = trophies.length;
-  const done = trophies.filter(isEarned).length;
-  const pct = Math.round((done / total) * 100);
-  $('progressCount').textContent = `${done} / ${total}`;
-  $('progressPct').textContent = `${pct}%`;
-  $('progressFill').style.width = `${pct}%`;
-  $('progressBar').setAttribute('aria-valuenow', String(done));
-  $('progressLine').textContent = done === total
-    ? 'Platinum earned — Vice Got a Price! Congratulations, Leonida Legend.'
-    : `Platinum: Vice Got a Price! — earn the other 54 trophies. ${total - done} to go.`;
-  const counts = $('gradeCounts');
-  counts.replaceChildren();
-  for (const grade of ['platinum', 'gold', 'silver', 'bronze']) {
-    const all = trophies.filter((t) => t.grade === grade);
-    const got = all.filter(isEarned).length;
-    const li = document.createElement('li');
-    const dot = document.createElement('span');
-    dot.className = `dot ${grade}`;
-    li.append(dot, document.createTextNode(`${GRADE_LABEL[grade]} ${got}/${all.length}`));
-    counts.append(li);
-  }
-  const next = nextUp(1)[0];
-  $('nextUpLine').textContent = next
-    ? `Next up: ${next.t.name} — ${next.whyShort}`
-    : 'All 55 trophies earned — platinum complete.';
+  const pct = total ? Math.round((earned / total) * 100) : 0;
+  $('earned-count').textContent = earned;
+  $('total-count').textContent = total;
+  $('earned-pct').textContent = pct + '%';
+  $('total-bar').style.width = pct + '%';
+  $('total-bar-wrap').setAttribute('aria-valuenow', String(pct));
 }
 
-// --- Up next planner ------------------------------------------------------
-// Ranked by what matters most: the missable first, then the next story trophy
-// in guide order, then the count trophies closest to finishing, then the
-// remaining gold and silver, then everything else.
-function nextUp(n) {
-  const remaining = trophies.filter((t) => !isEarned(t) && t.id !== 1);
-  const ranked = [];
-  const miss = remaining.find((t) => t.missable);
-  if (miss) {
-    ranked.push({ t: miss, why: 'The only missable trophy in the game — do it in Chapter 1, before it is gone for good.', whyShort: 'the one missable — do it in Chapter 1' });
-  }
-  const nextStory = remaining.filter((t) => t.kind === 'story' && !t.missable).sort((a, b) => a.id - b.id)[0];
-  if (nextStory && !ranked.some((r) => r.t.id === nextStory.id)) {
-    ranked.push({ t: nextStory, why: 'The next story trophy in order — it pops as you play the next chapter, so it is the cheapest trophy on the list right now.', whyShort: 'the next story trophy in order' });
-  }
-  const closest = remaining
-    .filter((t) => t.count && progressFrac(t) > 0 && !ranked.some((r) => r.t.id === t.id))
-    .sort((a, b) => progressFrac(b) - progressFrac(a) || a.id - b.id);
-  for (const t of closest) {
-    ranked.push({ t, why: `You are already ${Math.round(progressFrac(t) * 100)}% there (${fmtCount(targetOf(t), t)} of ${fmtCount(t.count, t)} on PSN's tracker) — finish this one before starting a new grind.`, whyShort: `${Math.round(progressFrac(t) * 100)}% done already — finish it first` });
-  }
-  const medals = remaining
-    .filter((t) => (t.grade === 'gold' || t.grade === 'silver') && !ranked.some((r) => r.t.id === t.id))
-    .sort((a, b) => GRADE_RANK[a.grade] - GRADE_RANK[b.grade] || a.id - b.id);
-  for (const t of medals) {
-    ranked.push({ t, why: `A ${GRADE_LABEL[t.grade].toLowerCase()} trophy still on the table — worth chasing before the long bronze cleanup.`, whyShort: `a ${GRADE_LABEL[t.grade].toLowerCase()} trophy still on the table` });
-  }
-  const rest = remaining
-    .filter((t) => !ranked.some((r) => r.t.id === t.id))
-    .sort((a, b) => a.id - b.id);
-  for (const t of rest) {
-    ranked.push({ t, why: 'Still to earn — open it in the checklist to read its guide and sources.', whyShort: 'still to earn' });
-  }
-  return ranked.slice(0, n);
-}
+// ---------- rendering: trophy card ----------
 
-function renderPlanner() {
-  const ol = $('plannerList');
-  ol.replaceChildren();
-  const picks = nextUp(6);
-  if (!picks.length) {
-    const li = document.createElement('li');
-    li.className = 'planner-empty';
-    li.textContent = 'Every trophy is earned — the platinum is yours.';
-    ol.append(li);
-    return;
+function masked(t) { return t.hidden && !state.spoiler; }
+
+function trophyCard(t) {
+  const li = el('li', 'trophy-card grade-' + t.grade + (isEarned(t) ? ' earned' : '') + (state.openId === t.id ? ' open' : ''));
+  li.dataset.id = t.id;
+
+  const head = el('div', 'trophy-head');
+  const box = document.createElement('input');
+  box.type = 'checkbox';
+  box.checked = isEarned(t);
+  box.setAttribute('aria-label', 'Mark ' + (masked(t) ? 'hidden trophy ' + t.id : t.name) + ' as earned');
+  box.addEventListener('change', () => { setEarned(t, box.checked); commit(); });
+  head.appendChild(box);
+
+  const nameWrap = el('h3', 'trophy-name');
+  const nameBtn = document.createElement('button');
+  nameBtn.type = 'button';
+  nameBtn.textContent = masked(t) ? 'Hidden trophy #' + t.id : t.name;
+  nameBtn.addEventListener('click', () => openDetail(t.id));
+  nameWrap.appendChild(nameBtn);
+  head.appendChild(nameWrap);
+
+  head.appendChild(el('span', 'badge badge-' + t.grade, gradeLabel(t.grade)));
+  if (t.hidden) head.appendChild(el('span', 'badge badge-hidden', 'Hidden'));
+  if (t.missable) head.appendChild(el('span', 'badge badge-missable', 'Missable'));
+  li.appendChild(head);
+
+  if (masked(t)) {
+    li.appendChild(el('p', 'trophy-desc spoiler-mask', 'Hidden until unlocked. Turn on “Show spoilers” to reveal this trophy.'));
+    li.appendChild(el('p', 'trophy-guide spoiler-mask', 'Guide hidden — spoilers are off.'));
+  } else {
+    li.appendChild(el('p', 'trophy-desc', t.description));
+    const guide = el('p', 'trophy-guide');
+    guide.appendChild(el('strong', null, 'How to get it: '));
+    guide.appendChild(document.createTextNode(t.guide));
+    li.appendChild(guide);
   }
-  picks.forEach((pick, i) => {
-    const t = pick.t;
-    const li = document.createElement('li');
-    if (t.missable) li.classList.add('missable-first');
-    const rank = document.createElement('span');
-    rank.className = 'plan-rank';
-    rank.textContent = String(i + 1);
-    const body = document.createElement('div');
-    const name = document.createElement('p');
-    name.className = 'trophy-name';
-    name.textContent = t.name;
-    const desc = document.createElement('p');
-    desc.className = 'trophy-desc';
-    desc.textContent = t.description;
-    const why = document.createElement('p');
-    why.className = 'plan-why';
-    why.append(document.createTextNode('Why now: '), document.createElement('strong'));
-    why.lastChild.textContent = pick.why;
-    body.append(name, desc, why);
-    const meta = document.createElement('div');
-    meta.className = 'trophy-meta';
-    const gradeBadge = document.createElement('span');
-    gradeBadge.className = `badge-grade ${t.grade}`;
-    gradeBadge.textContent = GRADE_LABEL[t.grade];
-    meta.append(gradeBadge);
-    if (t.missable) {
-      const m = document.createElement('span');
-      m.className = 'badge-missable';
-      m.textContent = 'Missable';
-      meta.append(m);
-    }
-    const count = formatCount(t);
-    if (count) {
-      const c = document.createElement('span');
-      c.className = 'badge-count';
-      c.textContent = `Target ${count}`;
-      meta.append(c);
-    }
-    body.append(meta);
-    const openBtn = document.createElement('button');
-    openBtn.type = 'button';
-    openBtn.className = 'btn plan-open';
-    openBtn.textContent = 'Open guide';
-    openBtn.addEventListener('click', (ev) => {
-      ev.stopPropagation();
-      showView('checklist');
-      selectTrophy(t.id);
-    });
-    li.append(rank, body, openBtn);
-    li.addEventListener('click', () => {
-      showView('checklist');
-      selectTrophy(t.id);
-    });
-    ol.append(li);
+  if (t.missable && t.missable_note) {
+    const note = el('p', 'missable-note');
+    note.appendChild(el('strong', null, 'Missable — '));
+    note.appendChild(document.createTextNode(t.missable_note));
+    li.appendChild(note);
+  }
+
+  // Sources line is always visible, even for hidden trophies.
+  const src = el('p', 'sources');
+  src.appendChild(el('strong', null, 'Sources: '));
+  src.appendChild(document.createTextNode((t.sources || []).join(', ')));
+  li.appendChild(src);
+
+  if (t.count) {
+    const step = el('div', 'stepper');
+    const minus = el('button', null, '−');
+    minus.type = 'button';
+    minus.setAttribute('aria-label', 'Decrease count for ' + t.name);
+    minus.addEventListener('click', () => { setCounter(t, counterOf(t) - 1); commit(); });
+    const plus = el('button', null, '+');
+    plus.type = 'button';
+    plus.setAttribute('aria-label', 'Increase count for ' + t.name);
+    plus.addEventListener('click', () => { setCounter(t, counterOf(t) + 1); commit(); });
+    const label = el('span', 'count-label', counterOf(t) + ' / ' + t.count + ' (' + Math.round(progressOf(t) * 100) + '%)');
+    const bar = el('div', 'mini-bar');
+    bar.appendChild(el('div')).style.width = (progressOf(t) * 100) + '%';
+    step.appendChild(minus);
+    step.appendChild(label);
+    step.appendChild(plus);
+    step.appendChild(bar);
+    li.appendChild(step);
+  }
+
+  const noteRow = el('div', 'note-row');
+  const noteLabel = el('label', null, 'Your note');
+  noteLabel.htmlFor = 'note-' + t.id;
+  const noteInput = document.createElement('input');
+  noteInput.type = 'text';
+  noteInput.id = 'note-' + t.id;
+  noteInput.placeholder = 'Add a note for this trophy…';
+  noteInput.value = state.notes[t.id] || '';
+  noteInput.addEventListener('change', () => {
+    const v = noteInput.value.trim();
+    if (v) state.notes[t.id] = v; else delete state.notes[t.id];
+    commit();
   });
+  noteRow.appendChild(noteLabel);
+  noteRow.appendChild(noteInput);
+  li.appendChild(noteRow);
+
+  return li;
 }
 
-// --- rendering: checklist -------------------------------------------------
-function visibleTrophies() {
-  const kind = $('kindFilter').value;
-  const grade = $('gradeFilter').value;
-  const sort = $('sortFilter').value;
-  const q = $('searchInput').value.trim().toLowerCase();
-  const shown = trophies.filter((t) => {
-    if (kind !== 'all') {
-      if (kind === 'missable') { if (!t.missable) return false; }
-      else if (t.kind !== kind) return false;
-    }
-    if (grade !== 'all' && t.grade !== grade) return false;
-    if (settings.hideEarned && isEarned(t)) return false;
-    if (q) {
-      const hay = `${t.name} ${t.description} ${t.guide}`.toLowerCase();
-      if (!hay.includes(q)) return false;
-    }
+// ---------- rendering: checklist ----------
+
+function filteredTrophies() {
+  const f = state.filters;
+  const q = f.search.trim().toLowerCase();
+  let list = trophies.filter((t) => {
+    if (f.grade !== 'all' && t.grade !== f.grade) return false;
+    if (f.hidden === 'hidden' && !t.hidden) return false;
+    if (f.hidden === 'visible' && t.hidden) return false;
+    if (f.missable === 'missable' && !t.missable) return false;
+    if (f.earned === 'earned' && !isEarned(t)) return false;
+    if (f.earned === 'unearned' && isEarned(t)) return false;
+    if (q && !(t.name.toLowerCase().includes(q) || t.description.toLowerCase().includes(q) || t.guide.toLowerCase().includes(q))) return false;
     return true;
   });
-  if (sort === 'name') shown.sort((a, b) => a.name.localeCompare(b.name));
-  else if (sort === 'grade') shown.sort((a, b) => GRADE_RANK[a.grade] - GRADE_RANK[b.grade] || a.id - b.id);
-  else if (sort === 'closest') shown.sort((a, b) => progressFrac(b) - progressFrac(a) || a.id - b.id);
-  return shown;
-}
-
-function fmtCount(n, t) {
-  if (t && (t.id === 52 || t.id === 53)) return `$${n.toLocaleString('en-US')}`;
-  return String(n);
-}
-
-function formatCount(t) {
-  if (t.count == null) return null;
-  if (t.id === 1) return '54 trophies';
-  if (t.id === 14) return '100%';
-  if (t.id === 52 || t.id === 53) return `$${t.count.toLocaleString('en-US')}`;
-  return `${t.count}×`;
-}
-
-function renderList() {
-  const shown = visibleTrophies();
-  listEl.replaceChildren();
-  for (const t of shown) {
-    const hidden = isSpoilerHidden(t);
-    const li = document.createElement('li');
-    li.className = 'trophy-item' + (isEarned(t) ? ' earned' : '') + (selectedId === t.id ? ' selected' : '');
-    li.dataset.id = String(t.id);
-
-    const box = document.createElement('input');
-    box.type = 'checkbox';
-    box.checked = isEarned(t);
-    box.setAttribute('aria-label', `Mark ${hidden ? 'story trophy' : t.name} as earned`);
-    box.addEventListener('click', (ev) => {
-      ev.stopPropagation();
-      toggleEarned(t, box.checked);
-    });
-
-    const body = document.createElement('div');
-    const name = document.createElement('p');
-    name.className = 'trophy-name' + (hidden ? ' spoiler-name' : '');
-    name.textContent = hidden ? 'Hidden story trophy — earn it to reveal' : t.name;
-    const desc = document.createElement('p');
-    desc.className = 'trophy-desc';
-    desc.textContent = hidden ? 'Hidden story trophy — earn it to reveal' : t.description;
-    body.append(name, desc);
-
-    const meta = document.createElement('div');
-    meta.className = 'trophy-meta';
-    const gradeBadge = document.createElement('span');
-    gradeBadge.className = `badge-grade ${t.grade}`;
-    gradeBadge.textContent = GRADE_LABEL[t.grade];
-    meta.append(gradeBadge);
-    const kindBadge = document.createElement('span');
-    kindBadge.className = 'badge-kind';
-    kindBadge.textContent = KIND_LABEL[t.kind] || t.kind;
-    meta.append(kindBadge);
-    const count = formatCount(t);
-    if (count) {
-      const countBadge = document.createElement('span');
-      countBadge.className = 'badge-count';
-      countBadge.textContent = `Target ${count}`;
-      meta.append(countBadge);
-    }
-    if (t.missable) {
-      const m = document.createElement('span');
-      m.className = 'badge-missable';
-      m.textContent = 'Missable';
-      meta.append(m);
-    }
-    if (t.hidden && !hidden) {
-      const h = document.createElement('span');
-      h.className = 'badge-hidden';
-      h.textContent = 'Hidden on PSN';
-      meta.append(h);
-    }
-    if (noteOf(t)) {
-      const nb = document.createElement('span');
-      nb.className = 'badge-note';
-      nb.textContent = 'Note';
-      meta.append(nb);
-    }
-    body.append(meta);
-    li.append(box, body);
-
-    // Target progress bar under the badges, for PSN-tracked count trophies.
-    if (t.count && t.id !== 1 && !hidden) {
-      const frac = progressFrac(t);
-      if (frac > 0) {
-        const bar = document.createElement('div');
-        bar.className = 'target-bar';
-        const fill = document.createElement('span');
-        fill.style.width = `${Math.round(frac * 100)}%`;
-        bar.append(fill);
-        const text = document.createElement('div');
-        text.className = 'target-text';
-        text.textContent = `${fmtCount(targetOf(t), t)} / ${fmtCount(t.count, t)} — ${Math.round(frac * 100)}%`;
-        li.append(bar, text);
-      }
-    }
-
-    li.addEventListener('click', () => selectTrophy(t.id));
-    listEl.append(li);
+  if (state.sort === 'grade') {
+    list.sort((a, b) => (GRADE_ORDER[a.grade] - GRADE_ORDER[b.grade]) || (a.id - b.id));
+  } else if (state.sort === 'name') {
+    list.sort((a, b) => a.name.localeCompare(b.name));
+  } else if (state.sort === 'progress') {
+    list.sort((a, b) => (progressOf(b) - progressOf(a)) || (a.id - b.id));
+  } else {
+    list.sort((a, b) => a.id - b.id);
   }
-  $('resultCount').textContent = `${shown.length} of ${trophies.length} shown`;
+  return list;
 }
 
-function toggleEarned(t, on) {
-  if (previewEarned.has(t.id)) previewEarned.delete(t.id);
-  if (on) earned.add(t.id);
-  else earned.delete(t.id);
-  saveProgress();
-  renderProgress();
-  renderList();
-  renderRoadmap();
-  renderPlanner();
-  if (selectedId === t.id) renderDetail();
-}
-
-function stepSize(t) {
-  if (t.count >= 10000) return 5000;
-  if (t.count >= 100) return 5;
-  return 1;
-}
-
-function setTarget(t, value) {
-  const clamped = Math.max(0, Math.min(t.count, value));
-  if (previewTargets.has(t.id)) previewTargets.delete(t.id);
-  if (clamped === 0) targets.delete(t.id);
-  else targets.set(t.id, clamped);
-  saveTargets();
-  renderProgress();
-  renderList();
-  renderPlanner();
-  if (selectedId === t.id) renderDetail();
-}
-
-// --- rendering: detail panel ----------------------------------------------
-function renderDetail() {
-  const t = byId.get(selectedId);
-  if (!t) {
-    detailEl.replaceChildren();
-    const p = document.createElement('p');
-    p.className = 'detail-empty';
-    p.textContent = 'Select a trophy to read its guide and sources.';
-    detailEl.append(p);
+function renderChecklist() {
+  const list = filteredTrophies();
+  const ul = $('trophy-list');
+  ul.innerHTML = '';
+  $('list-meta').textContent = 'Showing ' + list.length + ' of ' + trophies.length + ' trophies · ' +
+    trophies.filter(isEarned).length + ' earned';
+  if (!list.length) {
+    ul.appendChild(el('li', 'empty', 'No trophies match these filters.'));
     return;
   }
-  const hidden = isSpoilerHidden(t);
-  detailEl.replaceChildren();
-
-  // The head (name, description, badges) stays pinned while the guide below scrolls.
-  const head = document.createElement('div');
-  head.className = 'detail-head';
-  const h = document.createElement('h3');
-  h.textContent = hidden ? 'Hidden story trophy' : t.name;
-  head.append(h);
-
-  const desc = document.createElement('p');
-  desc.className = 'trophy-desc';
-  desc.textContent = hidden ? 'Hidden story trophy — earn it to reveal' : t.description;
-  head.append(desc);
-
-  const meta = document.createElement('div');
-  meta.className = 'trophy-meta';
-  const gradeBadge = document.createElement('span');
-  gradeBadge.className = `badge-grade ${t.grade}`;
-  gradeBadge.textContent = GRADE_LABEL[t.grade];
-  meta.append(gradeBadge);
-  if (t.missable) {
-    const m = document.createElement('span');
-    m.className = 'badge-missable';
-    m.textContent = 'Missable';
-    meta.append(m);
-  }
-  const count = formatCount(t);
-  if (count) {
-    const c = document.createElement('span');
-    c.className = 'badge-count';
-    c.textContent = `Target ${count}`;
-    meta.append(c);
-  }
-  head.append(meta);
-  detailEl.append(head);
-
-  // Compact source line right under the head, so the citation is visible
-  // in any screenshot even when the long guide runs past the fold.
-  if (!hidden && Array.isArray(t.sources) && t.sources.length) {
-    const srcLine = document.createElement('p');
-    srcLine.className = 'source-line';
-    srcLine.append(document.createTextNode('Sources: '));
-    t.sources.forEach((s, i) => {
-      if (i > 0) srcLine.append(document.createTextNode(' · '));
-      const a = document.createElement('a');
-      a.href = s.url;
-      a.target = '_blank';
-      a.rel = 'noopener';
-      a.textContent = s.name.split(' — ')[0];
-      srcLine.append(a);
-    });
-    detailEl.append(srcLine);
-  }
-
-  if (t.missable) {
-    const warn = document.createElement('p');
-    warn.className = 'missable-warn';
-    warn.textContent = t.missable_note;
-    detailEl.append(warn);
-  }
-
-  const guideH = document.createElement('h4');
-  guideH.textContent = 'Guide';
-  detailEl.append(guideH);
-  const guide = document.createElement('p');
-  guide.className = 'guide-text';
-  guide.textContent = hidden ? 'This guide is hidden until the trophy is earned.' : t.guide;
-  detailEl.append(guide);
-
-  // Target counter: track PSN's count here, and the checklist + planner follow.
-  if (!hidden && t.count && t.id !== 1) {
-    const targetH = document.createElement('h4');
-    targetH.textContent = 'Your progress';
-    detailEl.append(targetH);
-    const stepper = document.createElement('div');
-    stepper.className = 'stepper';
-    const minus = document.createElement('button');
-    minus.type = 'button';
-    minus.textContent = '−';
-    minus.setAttribute('aria-label', 'Decrease count');
-    minus.addEventListener('click', () => setTarget(t, targetOf(t) - stepSize(t)));
-    const value = document.createElement('span');
-    value.className = 'stepper-value';
-    value.textContent = `${fmtCount(targetOf(t), t)} / ${fmtCount(t.count, t)}`;
-    const plus = document.createElement('button');
-    plus.type = 'button';
-    plus.textContent = '+';
-    plus.setAttribute('aria-label', 'Increase count');
-    plus.addEventListener('click', () => setTarget(t, targetOf(t) + stepSize(t)));
-    stepper.append(minus, value, plus);
-    detailEl.append(stepper);
-    const stepNote = document.createElement('p');
-    stepNote.className = 'stepper-note';
-    stepNote.textContent = `PSN tracks this one up to ${fmtCount(t.count, t)} — tap + as you go; it is saved in this browser and feeds the Up next planner.`;
-    detailEl.append(stepNote);
-  }
-
-  // Personal note, saved in the browser.
-  if (!hidden) {
-    const noteH = document.createElement('h4');
-    noteH.textContent = 'Your note';
-    detailEl.append(noteH);
-    const box = document.createElement('textarea');
-    box.id = 'noteBox';
-    box.className = 'note-box';
-    box.placeholder = 'Your own note — where you left off, what to try next… (press n to jump here)';
-    box.value = noteOf(t);
-    const saved = document.createElement('p');
-    saved.className = 'note-saved';
-    box.addEventListener('input', () => {
-      const v = box.value;
-      if (previewNotes.has(t.id)) previewNotes.delete(t.id);
-      if (v.trim()) notes.set(t.id, v);
-      else notes.delete(t.id);
-      saveNotes();
-      saved.textContent = 'Note saved in this browser.';
-      renderList();
-    });
-    detailEl.append(box, saved);
-  }
-
-  if (!hidden && Array.isArray(t.sources) && t.sources.length) {
-    const srcH = document.createElement('h4');
-    srcH.textContent = 'Sources';
-    detailEl.append(srcH);
-    const ul = document.createElement('ul');
-    ul.className = 'source-list';
-    for (const s of t.sources) {
-      const li = document.createElement('li');
-      const a = document.createElement('a');
-      a.href = s.url;
-      a.target = '_blank';
-      a.rel = 'noopener';
-      a.textContent = s.name;
-      li.append(a);
-      ul.append(li);
-    }
-    detailEl.append(ul);
-  }
-
-  const toggleBtn = document.createElement('button');
-  toggleBtn.type = 'button';
-  toggleBtn.className = 'btn earned-toggle';
-  toggleBtn.textContent = isEarned(t) ? '✓ Earned — mark as not earned' : 'Mark as earned';
-  toggleBtn.addEventListener('click', () => toggleEarned(t, !isEarned(t)));
-  detailEl.append(toggleBtn);
-
-  const closeBtn = document.createElement('button');
-  closeBtn.type = 'button';
-  closeBtn.className = 'btn close-btn';
-  closeBtn.textContent = 'Close';
-  closeBtn.addEventListener('click', () => selectTrophy(null));
-  detailEl.append(closeBtn);
+  for (const t of list) ul.appendChild(trophyCard(t));
 }
 
-function selectTrophy(id) {
-  selectedId = id;
-  renderList();
-  renderDetail();
-}
+// ---------- rendering: roadmap ----------
 
-// Keyboard: / focuses search, e toggles the selected trophy, n focuses the
-// note box, Esc closes the open guide. Typing in a field disables them (except Esc).
-document.addEventListener('keydown', (ev) => {
-  const tag = (ev.target && ev.target.tagName) || '';
-  const typing = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
-  if (ev.key === 'Escape') {
-    if (selectedId !== null) { selectTrophy(null); ev.preventDefault(); }
-    return;
-  }
-  if (typing || ev.ctrlKey || ev.metaKey || ev.altKey) return;
-  if (ev.key === '/') { $('searchInput').focus(); ev.preventDefault(); }
-  else if (ev.key === 'e' && selectedId !== null) {
-    const t = byId.get(selectedId);
-    if (t) toggleEarned(t, !isEarned(t));
-  } else if (ev.key === 'n' && selectedId !== null) {
-    const box = $('noteBox');
-    if (box) { box.focus(); ev.preventDefault(); }
-  }
-});
+const ROADMAP_STAGES = [
+  { title: 'Stage 1 — Play the story', kinds: ['story'], text: 'Play the golden story icons in order. Story trophies pop as chapters and missions end. Do the first meditation in Chapter 1 before it ends — see Missables.' },
+  { title: 'Stage 2 — 100% completion checklist', kinds: ['completion', 'activity', 'collectible'], text: 'After the story, work the 100% completion checklist in the pause menu: activities, collectibles, vehicles and exploration, category by category.' },
+  { title: 'Stage 3 — The long grinds', kinds: ['count', 'challenge'], text: 'The counted grinds last: stunts, races, challenges, robberies and money. Fold them into normal play and chip away at the counters.' },
+];
 
-// --- rendering: roadmap ---------------------------------------------------
 function renderRoadmap() {
-  const ol = $('roadmapList');
-  ol.replaceChildren();
-  for (const stage of ROADMAP) {
-    const covered = stage.ids.map((id) => byId.get(id)).filter(Boolean);
-    const done = covered.filter(isEarned).length;
-    const li = document.createElement('li');
-    const h = document.createElement('h3');
-    h.append(document.createTextNode(stage.title + ' '));
-    const time = document.createElement('span');
-    time.className = 'stage-time';
-    time.textContent = stage.time;
-    h.append(time);
-    li.append(h);
-    const prog = document.createElement('div');
-    prog.className = 'stage-progress';
-    const bar = document.createElement('div');
-    bar.className = 'stage-bar';
-    const fill = document.createElement('span');
-    fill.style.width = `${covered.length ? Math.round((done / covered.length) * 100) : 0}%`;
-    bar.append(fill);
-    const cnt = document.createElement('span');
-    cnt.className = 'stage-count' + (done === covered.length ? ' stage-done' : '');
-    cnt.textContent = done === covered.length ? `${done}/${covered.length} — stage complete` : `${done}/${covered.length} trophies`;
-    prog.append(bar, cnt);
-    li.append(prog);
-    const ul = document.createElement('ul');
-    for (const point of stage.points) {
-      const p = document.createElement('li');
-      p.textContent = point;
-      ul.append(p);
-    }
-    li.append(ul);
-    ol.append(li);
+  const wrap = $('roadmap-stages');
+  wrap.innerHTML = '';
+  for (const stage of ROADMAP_STAGES) {
+    const items = trophies.filter((t) => stage.kinds.includes(t.kind));
+    const earned = items.filter(isEarned).length;
+    const pct = items.length ? Math.round((earned / items.length) * 100) : 0;
+    const box = el('div', 'roadmap-stage');
+    box.appendChild(el('h3', null, stage.title));
+    box.appendChild(el('p', null, stage.text));
+    const bar = el('div', 'progress-bar');
+    bar.appendChild(el('div', 'progress-fill')).style.width = pct + '%';
+    box.appendChild(bar);
+    box.appendChild(el('p', 'stage-meta', earned + ' / ' + items.length + ' earned · ' + pct + '%'));
+    const names = items.map((t) => (masked(t) ? 'Hidden trophy #' + t.id : t.name) + (t.missable ? ' ⚠ missable' : '')).join(' · ');
+    box.appendChild(el('p', 'stage-trophies', names));
+    wrap.appendChild(box);
   }
-  const cl = $('completionList');
-  cl.replaceChildren();
-  for (const need of COMPLETION_NEEDS) {
-    const li = document.createElement('li');
-    li.textContent = need;
-    cl.append(li);
-  }
+  const plat = el('div', 'roadmap-stage');
+  plat.appendChild(el('h3', null, 'Finish line — Platinum'));
+  const p = byId(1);
+  plat.appendChild(el('p', null, p && !isEarned(p)
+    ? '“' + p.name + '” unlocks itself the moment the other 54 trophies are earned. There is nothing extra to do.'
+    : 'Platinum earned — you are a Leonida Legend.'));
+  wrap.appendChild(plat);
 }
 
-// --- rendering: missables --------------------------------------------------
+// ---------- rendering: missables ----------
+
 function renderMissables() {
-  $('missableBadge').textContent = String(missables.length);
-  $('spoilerStatus').textContent = settings.spoiler
-    ? 'Spoiler protection is ON — story trophy names and descriptions stay hidden in the checklist until you earn them (change it in Settings).'
-    : 'Spoiler protection is OFF — story trophy names are shown in the checklist (change it in Settings).';
-  const ul = $('missableList');
-  ul.replaceChildren();
-  for (const t of missables) {
-    const li = document.createElement('li');
-    li.className = 'trophy-item missable-card';
-    const name = document.createElement('p');
-    name.className = 'trophy-name';
-    name.textContent = t.name;
-    const desc = document.createElement('p');
-    desc.className = 'trophy-desc';
-    desc.textContent = t.description;
-    const body = document.createElement('div');
-    body.append(name, desc);
-    const warn = document.createElement('p');
-    warn.className = 'missable-warn';
-    warn.textContent = t.missable_note;
-    body.append(warn);
-    if (Array.isArray(t.sources) && t.sources.length) {
-      const srcLine = document.createElement('p');
-      srcLine.className = 'source-line';
-      srcLine.append(document.createTextNode('Sources: '));
-      t.sources.forEach((s, i) => {
-        if (i > 0) srcLine.append(document.createTextNode(' · '));
-        const a = document.createElement('a');
-        a.href = s.url;
-        a.target = '_blank';
-        a.rel = 'noopener';
-        a.textContent = s.name.split(' — ')[0];
-        srcLine.append(a);
-      });
-      body.append(srcLine);
+  const ul = $('missable-list');
+  ul.innerHTML = '';
+  const list = trophies.filter((t) => t.missable);
+  if (!list.length) {
+    ul.appendChild(el('li', 'empty', 'No missable trophies.'));
+    return;
+  }
+  for (const t of list) ul.appendChild(trophyCard(t));
+}
+
+// ---------- rendering: planner ----------
+
+function renderPlanner() {
+  const ol = $('planner-list');
+  ol.innerHTML = '';
+  const queue = [];
+  const add = (t, why) => { if (t && !queue.some((q) => q.t.id === t.id)) queue.push({ t, why }); };
+
+  const missable = trophies.find((t) => t.missable && !isEarned(t));
+  if (missable) add(missable, 'Missable — do it in Chapter 1, before it can be lost.');
+
+  const nextStory = trophies.filter((t) => t.kind === 'story' && !isEarned(t)).sort((a, b) => a.id - b.id);
+  for (const t of nextStory.slice(0, 3)) add(t, 'Next story trophy — keep playing the main missions.');
+
+  const counted = trophies
+    .filter((t) => t.count && !isEarned(t))
+    .sort((a, b) => (progressOf(b) - progressOf(a)) || (a.id - b.id));
+  for (const t of counted.slice(0, 5)) {
+    add(t, 'Closest grind — ' + counterOf(t) + ' / ' + t.count + ' (' + Math.round(progressOf(t) * 100) + '% done).');
+  }
+
+  const rest = trophies.filter((t) => !isEarned(t)).sort((a, b) => a.id - b.id);
+  for (const t of rest) {
+    if (queue.length >= 10) break;
+    add(t, 'Next on the list.');
+  }
+
+  if (!queue.length) {
+    ol.appendChild(el('li', 'planner-done', 'All 55 trophies earned — platinum is yours.'));
+    return;
+  }
+  queue.forEach((item, i) => {
+    const li = el('li', 'planner-item');
+    li.appendChild(el('span', 'planner-rank', String(i + 1)));
+    const body = el('div');
+    const h = el('h3');
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = masked(item.t) ? 'Hidden trophy #' + item.t.id : item.t.name;
+    btn.addEventListener('click', () => openDetail(item.t.id));
+    h.appendChild(btn);
+    body.appendChild(h);
+    body.appendChild(el('p', 'planner-why', item.why));
+    body.appendChild(el('p', null, item.t.description));
+    if (item.t.count) {
+      body.appendChild(el('p', null, 'Progress: ' + counterOf(item.t) + ' / ' + item.t.count + ' (' + Math.round(progressOf(item.t) * 100) + '%).'));
     }
-    const guide = document.createElement('p');
-    guide.className = 'guide-text';
-    guide.textContent = t.guide;
-    body.append(guide);
-    li.append(body);
-    li.addEventListener('click', () => {
-      showView('checklist');
-      selectTrophy(t.id);
-    });
-    ul.append(li);
+    li.appendChild(body);
+    ol.appendChild(li);
+  });
+}
+
+// ---------- detail panel ----------
+
+function fillDetail(id) {
+  const t = byId(id);
+  const panel = $('detail-panel');
+  const body = $('detail-body');
+  body.innerHTML = '';
+  if (!t) { panel.hidden = true; return; }
+  body.appendChild(el('h2', null, masked(t) ? 'Hidden trophy #' + t.id : t.name));
+  body.appendChild(el('p', null, '')).textContent = gradeLabel(t.grade) + ' trophy' + (t.hidden ? ' · Hidden' : '') + (t.missable ? ' · Missable' : '') + (isEarned(t) ? ' · Earned' : '');
+  if (!masked(t)) {
+    body.appendChild(el('p', null, t.description));
+    const guide = el('p', null, '');
+    guide.appendChild(el('strong', null, 'How to get it: '));
+    guide.appendChild(document.createTextNode(t.guide));
+    body.appendChild(guide);
+  } else {
+    body.appendChild(el('p', 'spoiler-mask', 'Hidden until unlocked. Turn on “Show spoilers” to reveal this trophy.'));
   }
-}
-
-// --- views ------------------------------------------------------------------
-const VIEWS = ['checklist', 'roadmap', 'missables', 'planner'];
-function showView(name) {
-  for (const btn of document.querySelectorAll('.tab')) {
-    const active = btn.dataset.view === name;
-    btn.classList.toggle('active', active);
-    if (active) btn.setAttribute('aria-current', 'page');
-    else btn.removeAttribute('aria-current');
+  if (t.missable && t.missable_note) {
+    const note = el('p', 'missable-note');
+    note.appendChild(el('strong', null, 'Missable — '));
+    note.appendChild(document.createTextNode(t.missable_note));
+    body.appendChild(note);
   }
-  for (const v of VIEWS) $(`view-${v}`).hidden = v !== name;
-  if (name === 'planner') renderPlanner();
-  if (name === 'roadmap') renderRoadmap();
+  const src = el('p', 'sources');
+  src.appendChild(el('strong', null, 'Sources: '));
+  src.appendChild(document.createTextNode((t.sources || []).join(', ')));
+  body.appendChild(src);
+  if (t.count) {
+    body.appendChild(el('p', null, 'Progress: ' + counterOf(t) + ' / ' + t.count + ' (' + Math.round(progressOf(t) * 100) + '%). Use the − / + stepper on the trophy card to update it.'));
+  }
+  panel.hidden = false;
 }
 
-for (const btn of document.querySelectorAll('.tab')) {
-  btn.addEventListener('click', () => showView(btn.dataset.view));
+function openDetail(id) {
+  state.openId = id;
+  fillDetail(id);
+  commit();
 }
 
-// --- settings, export, import ----------------------------------------------
-const settingsPanel = $('settingsPanel');
-$('settingsBtn').addEventListener('click', () => {
-  const open = settingsPanel.hidden;
-  settingsPanel.hidden = !open;
-  $('settingsBtn').setAttribute('aria-expanded', String(open));
-});
-
-function syncSettingsUI() {
-  $('spoilerToggle').checked = settings.spoiler;
-  $('hideEarnedToggle').checked = settings.hideEarned;
+function closeDetail() {
+  state.openId = null;
+  $('detail-panel').hidden = true;
+  commit();
 }
-$('spoilerToggle').addEventListener('change', (ev) => {
-  settings.spoiler = ev.target.checked;
-  saveSettings();
-  renderList();
-  renderDetail();
-  renderMissables();
-});
-$('hideEarnedToggle').addEventListener('change', (ev) => {
-  settings.hideEarned = ev.target.checked;
-  saveSettings();
-  renderList();
-});
 
-$('exportBtn').addEventListener('click', () => {
-  const payload = {
+// ---------- export / import ----------
+
+function exportData() {
+  const data = {
     game: 'Grand Theft Auto VI',
-    platform: 'PlayStation 5',
-    version: 2,
-    exported: new Date().toISOString(),
-    earned: [...earned].sort((a, b) => a - b),
-    targets: Object.fromEntries(targets),
-    notes: Object.fromEntries(notes),
+    guide: 'Leonida Trophy Guide',
+    version: 3,
+    earned: [...state.earned].sort((a, b) => a - b),
+    counters: state.counters,
+    notes: state.notes,
+    spoiler: state.spoiler,
   };
-  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const text = JSON.stringify(data, null, 2);
+  $('io-text').value = text;
+  const blob = new Blob([text], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = 'gta6-trophy-progress.json';
+  a.download = 'leonida-trophy-progress.json';
   a.click();
-  URL.revokeObjectURL(a.href);
-});
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
 
-$('importFile').addEventListener('change', async (ev) => {
-  const file = ev.target.files[0];
-  const msg = $('importMsg');
-  if (!file) return;
-  try {
-    const data = JSON.parse(await file.text());
-    const ids = Array.isArray(data) ? data : data.earned;
-    if (!Array.isArray(ids)) throw new Error('no earned list');
-    const valid = ids.filter((n) => Number.isInteger(n) && byId.has(n));
-    earned = new Set(valid);
-    saveProgress();
-    if (data && typeof data === 'object' && !Array.isArray(data)) {
-      targets = new Map();
-      if (data.targets && typeof data.targets === 'object') {
-        for (const [k, v] of Object.entries(data.targets)) {
-          const id = Number(k);
-          if (Number.isInteger(id) && byId.has(id) && Number.isFinite(v) && v > 0) targets.set(id, Math.floor(v));
-        }
-      }
-      saveTargets();
-      notes = new Map();
-      if (data.notes && typeof data.notes === 'object') {
-        for (const [k, v] of Object.entries(data.notes)) {
-          const id = Number(k);
-          if (Number.isInteger(id) && byId.has(id) && typeof v === 'string' && v.trim()) notes.set(id, v);
-        }
-      }
-      saveNotes();
-    }
-    renderProgress();
-    renderList();
-    renderDetail();
-    renderRoadmap();
-    renderPlanner();
-    msg.textContent = `Imported ${valid.length} earned trophies from ${file.name}.`;
-  } catch {
-    msg.textContent = `Could not import ${file.name}: not a valid progress file.`;
-  }
-  ev.target.value = '';
-});
+function importData(text) {
+  let data;
+  try { data = JSON.parse(text); } catch (e) { alert('Could not read that JSON. Check the text and try again.'); return; }
+  if (Array.isArray(data.earned)) state.earned = new Set(data.earned.filter((n) => Number.isFinite(n)));
+  if (data.counters && typeof data.counters === 'object') state.counters = data.counters;
+  if (data.notes && typeof data.notes === 'object') state.notes = data.notes;
+  if (typeof data.spoiler === 'boolean') state.spoiler = data.spoiler;
+  $('spoiler-toggle').checked = state.spoiler;
+  commit();
+}
 
-$('resetBtn').addEventListener('click', () => {
-  if (!window.confirm('Reset all progress? This clears every earned trophy, target counter and note.')) return;
-  earned = new Set();
-  targets = new Map();
-  notes = new Map();
-  previewEarned.clear();
-  previewTargets.clear();
-  previewNotes.clear();
-  saveProgress();
-  saveTargets();
-  saveNotes();
-  renderProgress();
-  renderList();
-  renderDetail();
+// ---------- tabs / view ----------
+
+function setView(view) {
+  state.view = view;
+  document.querySelectorAll('.tab').forEach((tab) => {
+    const active = tab.dataset.view === view;
+    tab.classList.toggle('active', active);
+    tab.setAttribute('aria-selected', String(active));
+  });
+  document.querySelectorAll('.view').forEach((v) => {
+    v.classList.toggle('active', v.id === 'view-' + view);
+  });
+  commit();
+}
+
+// ---------- render all ----------
+
+function renderAll() {
+  renderHeader();
+  renderChecklist();
   renderRoadmap();
+  renderMissables();
   renderPlanner();
-});
+  document.querySelectorAll('.tab').forEach((tab) => {
+    const active = tab.dataset.view === state.view;
+    tab.classList.toggle('active', active);
+    tab.setAttribute('aria-selected', String(active));
+  });
+  document.querySelectorAll('.view').forEach((v) => {
+    v.classList.toggle('active', v.id === 'view-' + state.view);
+  });
+  $('spoiler-toggle').checked = state.spoiler;
+  if (state.openId && byId(state.openId)) fillDetail(state.openId);
+  else $('detail-panel').hidden = true;
+}
 
-// --- filters ------------------------------------------------------------------
-$('kindFilter').addEventListener('change', renderList);
-$('gradeFilter').addEventListener('change', renderList);
-$('sortFilter').addEventListener('change', renderList);
-$('searchInput').addEventListener('input', renderList);
+// ---------- boot ----------
 
-// --- init ---------------------------------------------------------------------
-syncSettingsUI();
-if (params.get('kind')) $('kindFilter').value = params.get('kind');
-if (params.get('grade')) $('gradeFilter').value = params.get('grade');
-if (params.get('sort')) $('sortFilter').value = params.get('sort');
-if (params.get('search')) $('searchInput').value = params.get('search');
-renderProgress();
-renderList();
-renderRoadmap();
-renderMissables();
-renderPlanner();
-renderDetail();
-if (params.get('open')) {
-  const id = Number(params.get('open'));
-  if (byId.has(id)) selectTrophy(id);
+async function boot() {
+  loadStored();
+  readUrl();
+  try {
+    const res = await fetch(DATA_URL);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    trophies = data.trophies || [];
+    sourceNames = (data.sources || []).map((s) => s.name);
+  } catch (e) {
+    $('trophy-list').innerHTML = '';
+    $('trophy-list').appendChild(el('li', 'empty', 'Could not load the trophy data. Open this guide from its own folder so data/trophies.json can load.'));
+    return;
+  }
+  if (state.openId && !byId(state.openId)) state.openId = null;
+
+  document.querySelectorAll('.tab').forEach((tab) => {
+    tab.addEventListener('click', () => setView(tab.dataset.view));
+  });
+  $('search').addEventListener('input', (e) => { state.filters.search = e.target.value; renderChecklist(); });
+  $('filter-grade').addEventListener('change', (e) => { state.filters.grade = e.target.value; renderChecklist(); });
+  $('filter-hidden').addEventListener('change', (e) => { state.filters.hidden = e.target.value; renderChecklist(); });
+  $('filter-missable').addEventListener('change', (e) => { state.filters.missable = e.target.value; renderChecklist(); });
+  $('filter-earned').addEventListener('change', (e) => { state.filters.earned = e.target.value; renderChecklist(); });
+  $('sort').addEventListener('change', (e) => { state.sort = e.target.value; renderChecklist(); });
+  $('spoiler-toggle').addEventListener('change', (e) => { state.spoiler = e.target.checked; commit(); });
+  $('export-btn').addEventListener('click', exportData);
+  $('import-btn').addEventListener('click', () => {
+    const text = $('io-text').value.trim();
+    if (text) { importData(text); return; }
+    $('import-file').click();
+  });
+  $('import-file').addEventListener('change', (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => { $('io-text').value = String(reader.result || ''); importData(String(reader.result || '')); };
+    reader.readAsText(file);
+    e.target.value = '';
+  });
+  $('reset-btn').addEventListener('click', () => {
+    if (!confirm('Reset all progress, counters and notes?')) return;
+    state.earned = new Set();
+    state.counters = {};
+    state.notes = {};
+    commit();
+  });
+  $('detail-close').addEventListener('click', closeDetail);
+  document.addEventListener('keydown', (e) => {
+    const tag = (e.target && e.target.tagName) || '';
+    if (e.key === '/' && tag !== 'INPUT' && tag !== 'TEXTAREA' && tag !== 'SELECT') {
+      e.preventDefault();
+      if (state.view !== 'checklist') setView('checklist');
+      $('search').focus();
+    }
+    if (e.key === 'Escape' && state.openId) closeDetail();
+  });
+
+  renderAll();
+  // Persist the URL-resolved state once, so a plain reload keeps it.
+  saveStored();
+  writeUrl();
 }
-if (params.get('view') && VIEWS.includes(params.get('view'))) {
-  showView(params.get('view'));
-}
-if (params.get('settings') === '1') {
-  settingsPanel.hidden = false;
-  $('settingsBtn').setAttribute('aria-expanded', 'true');
-}
+
+boot();

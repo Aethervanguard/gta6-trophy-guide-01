@@ -1,11 +1,29 @@
-[![make.fun · gta6-trophy-guide-01](https://make.fun/badge/gta6-trophy-guide-01.svg)](https://make.fun/bounty/gta6-trophy-guide-01?utm_source=github&utm_medium=readme&utm_campaign=gta6-trophy-guide-01)
-[![rank](https://make.fun/badge/gta6-trophy-guide-01/Aethervanguard/gta6-trophy-guide-01/rank.svg)](https://make.fun/bounty/gta6-trophy-guide-01/leaderboard?utm_source=github&utm_medium=readme&utm_campaign=gta6-trophy-guide-01)
-[![reward](https://make.fun/badge/gta6-trophy-guide-01/Aethervanguard/gta6-trophy-guide-01/reward.svg)](https://make.fun/bounty/gta6-trophy-guide-01?utm_source=github&utm_medium=readme&utm_campaign=gta6-trophy-guide-01)
+# Leonida Trophy Guide — GTA VI (PS5)
 
-# Leonida Trophy Guide — GTA VI Trophy Guide & Tracker (PS5)
+A complete, spoiler-safe trophy guide for Grand Theft Auto VI on PlayStation 5: all 55 official trophies with a strategy for each one in plain words, a roadmap to the platinum, missable-trophy warnings, target counters, and an Up next planner — all offline, in your browser.
 
-An offline trophy guide and tracker for Grand Theft Auto VI on PS5. It covers all 55 official trophies, with a step-by-step platinum roadmap that orders the grind so nothing missable slips past, and an **Up next** planner that ranks the next trophies to chase: the one missable first, then the next story trophy, then the count trophies closest to done.
+![bounty](https://make.fun/badge/gta6-trophy-guide-01.svg)
+![rank](https://make.fun/badge/gta6-trophy-guide-01/Aethervanguard/gta6-trophy-guide-01/rank.svg)
+![reward](https://make.fun/badge/gta6-trophy-guide-01/Aethervanguard/gta6-trophy-guide-01/reward.svg)
 
-Every trophy guide cites its sources, so you can check where each tip comes from. Your checklist is saved in the browser, with export and import if you switch devices, and filters plus a spoiler setting let you hide what you do not want to see yet. Count trophies (42 shooting-range golds, 250 stunts, …) get their own + / − target counter that feeds the planner, and each trophy takes a personal note. Keyboard: `/` search, `e` mark the selected trophy earned, `n` write a note, `Esc` close the guide.
+- Bounty: https://make.fun/bounty/gta6-trophy-guide-01
+- Built for the make.fun bounty — join with my referral link: https://make.fun/r/6c5vqfqh
 
-Run it locally with `node serve.ts`, or build the submission dossier with `mkdir -p out && MAKEFUN_OUTPUT_DIR=out node main.ts`.
+## What is inside
+
+- **Checklist** — all 55 trophies (1 platinum, 2 gold, 6 silver, 46 bronze), with grade and spoiler filters, per-trophy guides, sources, and progress tracking.
+- **Roadmap** — the sensible order: story first, then the 100% completion checklist, then the long grinds.
+- **Missables** — the one trophy that may be missable (Positive Mental Attitude: meditate at Jason's house in Chapter 1) and how to protect it.
+- **Planner** — an Up next list that turns your remaining trophies into a short queue.
+
+## Run it
+
+```sh
+node serve.ts
+```
+
+Then open http://localhost:8080 — no build step, no network needed.
+
+## Data
+
+Trophy names, descriptions, and grades are the official PlayStation list as published on 2026-11-18. Guides are written in our own words from the trophy descriptions and the game's mechanics; sources consulted include PowerPyx, Exophase, PSNProfiles, Planet GTA 6, Sixshore, GTA Spotter, GTA Vice City Hub, Push Square, and TrueAchievements.
